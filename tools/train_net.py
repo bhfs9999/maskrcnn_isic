@@ -10,6 +10,7 @@ from maskrcnn_benchmark.utils.env import setup_environment  # noqa F401 isort:sk
 import argparse
 import os
 
+import tensorboardX
 import torch
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.data import make_data_loader
@@ -61,6 +62,13 @@ def train(cfg, local_rank, distributed):
     )
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
+    vis_period = cfg.SOLVER.VIS_PERIOD
+
+    from datetime import datetime
+
+    current_time = datetime.now().strftime('%b%d_%H-%M-%S')
+    log_dir = os.path.join(cfg.OUTPUT_DIR, current_time)
+    tb_writer = tensorboardX.SummaryWriter(log_dir=log_dir)
 
     do_train(
         model,
@@ -70,7 +78,10 @@ def train(cfg, local_rank, distributed):
         checkpointer,
         device,
         checkpoint_period,
+        vis_period,
         arguments,
+        cfg,
+        tb_writer
     )
 
     return model

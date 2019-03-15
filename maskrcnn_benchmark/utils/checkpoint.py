@@ -52,7 +52,7 @@ class Checkpointer(object):
     def load(self, f=None):
         if self.has_checkpoint():
             # override argument with existing checkpoint
-            f = self.get_checkpoint_file()
+            f = self.get_checkpoint_file(f)
         if not f:
             # no checkpoint could be found
             self.logger.info("No checkpoint found. Initializing model from scratch")
@@ -74,17 +74,21 @@ class Checkpointer(object):
         save_file = os.path.join(self.save_dir, "last_checkpoint")
         return os.path.exists(save_file)
 
-    def get_checkpoint_file(self):
-        save_file = os.path.join(self.save_dir, "last_checkpoint")
-        try:
-            with open(save_file, "r") as f:
-                last_saved = f.read()
-                last_saved = last_saved.strip()
-        except IOError:
-            # if file doesn't exist, maybe because it has just been
-            # deleted by a separate process
-            last_saved = ""
-        return last_saved
+    def get_checkpoint_file(self, file):
+        if file.startswith('resume'):
+            resume = file.split('_')[1]
+            ckp_path = os.path.join(self.save_dir, "model_{:07d}.pth".format(int(resume)))
+        else:
+            save_file = os.path.join(self.save_dir, "last_checkpoint")
+            try:
+                with open(save_file, "r") as f:
+                    ckp_path = f.read()
+                    ckp_path = ckp_path.strip()
+            except IOError:
+                # if file doesn't exist, maybe because it has just been
+                # deleted by a separate process
+                ckp_path = ""
+        return ckp_path
 
     def tag_last_checkpoint(self, last_filename):
         save_file = os.path.join(self.save_dir, "last_checkpoint")

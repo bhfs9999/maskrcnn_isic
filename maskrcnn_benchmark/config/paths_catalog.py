@@ -7,6 +7,21 @@ import os
 class DatasetCatalog(object):
     DATA_DIR = "datasets"
     DATASETS = {
+        "ISIC_2017_train": {
+            "ann_file": "/data/lxc/Skin/ISIC-2017/detection_600/Training/annotations.txt",
+            "root": "/data/mxj/Skin/ISIC-2017/images_600/Training",
+            "mask_root": "/data/mxj/Skin/ISIC-2017/annotations_600/Training"
+        },
+        "ISIC_2017_val": {
+            "ann_file": "/data/lxc/Skin/ISIC-2017/detection_600/Validation/annotations.txt",
+            "root": "/data/mxj/Skin/ISIC-2017/images_600/Validation",
+            "mask_root": "/data/mxj/Skin/ISIC-2017/annotations_600/Validation"
+        },
+        "ISIC_2017_test": {
+            "ann_file": "/data/lxc/Skin/ISIC-2017/detection_600/Test/annotations.txt",
+            "root": "/data/mxj/Skin/ISIC-2017/images_600/Test",
+            "mask_root": "/data/mxj/Skin/ISIC-2017/annotations_600/Test"
+        },
         "coco_2014_train": {
             "img_dir": "coco/train2014",
             "ann_file": "coco/annotations/instances_train2014.json"
@@ -39,8 +54,12 @@ class DatasetCatalog(object):
             "img_dir": "voc/VOC2007/JPEGImages",
             "ann_file": "voc/VOC2007/Annotations/pascal_val2007.json"
         },
+        "voc_2007_trainval": {
+            "data_dir": "/data/lxc/VOC2007/VOC2007_trainval",
+            "split": "train"
+        },
         "voc_2007_test": {
-            "data_dir": "voc/VOC2007",
+            "data_dir": "/data/lxc/VOC2007/VOC2007_test",
             "split": "test"
         },
         "voc_2007_test_cocostyle": {
@@ -106,6 +125,18 @@ class DatasetCatalog(object):
                 factory="PascalVOCDataset",
                 args=args,
             )
+        elif "ISIC" in name:
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                ann_file=attrs["ann_file"],
+                root=attrs["root"],
+                mask_root=attrs["mask_root"]
+            )
+            return dict(
+                factory="ISICDataset",
+                args=args,
+            )
+
         raise RuntimeError("Dataset not available: {}".format(name))
 
 
