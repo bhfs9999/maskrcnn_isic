@@ -61,6 +61,8 @@ _C.INPUT.TO_BGR255 = True
 _C.DATASETS = CN()
 # List of the dataset names for training, as present in paths_catalog.py
 _C.DATASETS.TRAIN = ()
+# List of the dataset names for validation, as present in paths_catalog.py
+_C.DATASETS.VALID = ()
 # List of the dataset names for testing, as present in paths_catalog.py
 _C.DATASETS.TEST = ()
 
@@ -395,12 +397,13 @@ _C.SOLVER.WARMUP_ITERS = 500
 _C.SOLVER.WARMUP_METHOD = "linear"
 
 _C.SOLVER.CHECKPOINT_PERIOD = 2500
+_C.SOLVER.VIS_ON = False
 _C.SOLVER.VIS_PERIOD = 100
 
 # loss weight for box and mask
 _C.SOLVER.LOSS_WEIGHT = CN()
 _C.SOLVER.LOSS_WEIGHT.BOX_WEIGHT = 1.
-_C.SOLVER.LOSS_WEIGHT.MASK_WEIGHT = 0.1
+_C.SOLVER.LOSS_WEIGHT.MASK_WEIGHT = 1.
 
 # Number of images per batch
 # This is global, so if we have 8 GPUs and IMS_PER_BATCH = 16, each GPU will

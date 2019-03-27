@@ -97,6 +97,7 @@ class Pooler(nn.Module):
             result (Tensor)
         """
         num_levels = len(self.poolers)
+        # size: boxnum*5, x1, y1, x2 ,y2, bs_no.
         rois = self.convert_to_roi_format(boxes)
         if num_levels == 1:
             return self.poolers[0](x[0], rois)

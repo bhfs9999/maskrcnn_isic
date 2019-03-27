@@ -19,6 +19,7 @@ def do_isic_evaluation(
     expected_results,
     expected_results_sigma_tol,
 ):
+    eval_return = {}
     logger = logging.getLogger("maskrcnn_benchmark.inference")
 
     if box_only:
@@ -48,6 +49,7 @@ def do_isic_evaluation(
             )
         calc_overlap_rate(pred_boxlists, gt_boxlists)
         logger.info(result_str)
+        eval_return["map"] = result["map"]
 
     if "segm" in iou_types:
         logger.info("Preparing segm results")
@@ -68,7 +70,7 @@ def do_isic_evaluation(
 
             # Binarize masks
             gt = gt_mask > 0.5
-            pr = pred_mask > 0.3
+            pr = pred_mask > 0.5
 
             ious[i] = IoU(gt, pr)
             dices[i] = Dice(gt, pr)
@@ -76,11 +78,16 @@ def do_isic_evaluation(
         result_str += "Mean IOU: {}".format(ious.mean())
         result_str += "Mean Dice: {}".format(dices.mean())
 
+        eval_return["iou"] = ious.mean()
+        eval_return["dice"] = dices.mean()
+
     logger.info(result_str)
     # check_expected_results(results, expected_results, expected_results_sigma_tol)
     if output_folder:
         with open(os.path.join(output_folder, "result.txt"), "w") as fid:
             fid.write(result_str)
+
+    return eval_return
 
 def save_detection_result(img_namelists, pred_boxlists, output_folder):
     with open(os.path.join(output_folder, "detection.txt"), "w") as f:
@@ -174,7 +181,6 @@ def prepare_for_isic_segmentation(predictions, dataset):
         mapped_labels = labels
 
         gt_mask = dataset.get_gt_mask(image_id)
-
         isic_results.extend(
             [
                 {

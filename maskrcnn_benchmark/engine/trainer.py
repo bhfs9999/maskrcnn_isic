@@ -49,8 +49,10 @@ def do_train(
     vis_period,
     arguments,
     cfg,
-    tb_writer
+    tb_writer,
+    distributed
 ):
+    from tools.train_net import run_test
     logger = logging.getLogger("maskrcnn_benchmark.trainer")
     logger.info("Start training")
     meters = MetricLogger(delimiter="  ")
@@ -116,7 +118,7 @@ def do_train(
                     memory=torch.cuda.max_memory_allocated() / 1024.0 / 1024.0,
                 )
             )
-        if iteration % vis_period == 0:
+        if cfg.SOLVER.VIS_ON and iteration % vis_period == 0:
             # visualize predict box
             # set model to eval mode
             model.eval()
@@ -145,6 +147,13 @@ def do_train(
             vis_num %= len(data_loader.dataset)
         if iteration % checkpoint_period == 0:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
+
+            # eval
+            model.eval()
+            result = run_test(cfg, model, distributed, valid=True)
+            tb_writer.add_scalars('Valid', result, global_step=iteration)
+            model.train()
+
         if iteration == max_iter:
             checkpointer.save("model_final", **arguments)
 

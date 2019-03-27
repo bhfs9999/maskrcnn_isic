@@ -81,13 +81,14 @@ def train(cfg, local_rank, distributed):
         vis_period,
         arguments,
         cfg,
-        tb_writer
+        tb_writer,
+        distributed
     )
 
     return model
 
 
-def run_test(cfg, model, distributed):
+def run_test(cfg, model, distributed, valid=False):
     if distributed:
         model = model.module
     torch.cuda.empty_cache()  # TODO check if it helps
@@ -96,27 +97,54 @@ def run_test(cfg, model, distributed):
         iou_types = iou_types + ("segm",)
     if cfg.MODEL.KEYPOINT_ON:
         iou_types = iou_types + ("keypoints",)
-    output_folders = [None] * len(cfg.DATASETS.TEST)
-    dataset_names = cfg.DATASETS.TEST
-    if cfg.OUTPUT_DIR:
-        for idx, dataset_name in enumerate(dataset_names):
-            output_folder = os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
-            mkdir(output_folder)
-            output_folders[idx] = output_folder
-    data_loaders_val = make_data_loader(cfg, is_train=False, is_distributed=distributed)
-    for output_folder, dataset_name, data_loader_val in zip(output_folders, dataset_names, data_loaders_val):
-        inference(
-            model,
-            data_loader_val,
-            dataset_name=dataset_name,
-            iou_types=iou_types,
-            box_only=False if cfg.MODEL.RETINANET_ON else cfg.MODEL.RPN_ONLY,
-            device=cfg.MODEL.DEVICE,
-            expected_results=cfg.TEST.EXPECTED_RESULTS,
-            expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
-            output_folder=output_folder,
-        )
-        synchronize()
+
+    if valid:
+        output_folders = [None] * len(cfg.DATASETS.VALID)
+        dataset_names = cfg.DATASETS.VALID
+        if cfg.OUTPUT_DIR:
+            for idx, dataset_name in enumerate(dataset_names):
+                output_folder = os.path.join(cfg.OUTPUT_DIR, "validation", dataset_name)
+                mkdir(output_folder)
+                output_folders[idx] = output_folder
+        data_loaders_val = make_data_loader(cfg, is_train=False, is_distributed=distributed)
+        result = None
+        for output_folder, dataset_name, data_loader_val in zip(output_folders, dataset_names, data_loaders_val):
+            # TODO if multiple valid set, result will be a list
+            result = inference(
+                        model,
+                        data_loader_val,
+                        dataset_name=dataset_name,
+                        iou_types=iou_types,
+                        box_only=False if cfg.MODEL.RETINANET_ON else cfg.MODEL.RPN_ONLY,
+                        device=cfg.MODEL.DEVICE,
+                        expected_results=cfg.TEST.EXPECTED_RESULTS,
+                        expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
+                        output_folder=output_folder,
+                    )
+            synchronize()
+        return result
+    else:
+        output_folders = [None] * len(cfg.DATASETS.TEST)
+        dataset_names = cfg.DATASETS.TEST
+        if cfg.OUTPUT_DIR:
+            for idx, dataset_name in enumerate(dataset_names):
+                output_folder = os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
+                mkdir(output_folder)
+                output_folders[idx] = output_folder
+        data_loaders_test = make_data_loader(cfg, is_train=False, is_distributed=distributed)
+        for output_folder, dataset_name, data_loader_val in zip(output_folders, dataset_names, data_loaders_test):
+            inference(
+                model,
+                data_loader_val,
+                dataset_name=dataset_name,
+                iou_types=iou_types,
+                box_only=False if cfg.MODEL.RETINANET_ON else cfg.MODEL.RPN_ONLY,
+                device=cfg.MODEL.DEVICE,
+                expected_results=cfg.TEST.EXPECTED_RESULTS,
+                expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
+                output_folder=output_folder,
+            )
+            synchronize()
 
 
 def main():
@@ -178,7 +206,7 @@ def main():
     model = train(cfg, args.local_rank, args.distributed)
 
     if not args.skip_test:
-        run_test(cfg, model, args.distributed)
+        run_test(cfg, model, args.distributed, valid=False)
 
 
 if __name__ == "__main__":
