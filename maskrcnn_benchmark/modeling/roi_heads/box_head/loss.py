@@ -23,7 +23,8 @@ class FastRCNNLossComputation(object):
         proposal_matcher, 
         fg_bg_sampler, 
         box_coder, 
-        cls_agnostic_bbox_reg=False
+        cls_agnostic_bbox_reg=False,
+        cls_weight=None
     ):
         """
         Arguments:
@@ -35,6 +36,7 @@ class FastRCNNLossComputation(object):
         self.fg_bg_sampler = fg_bg_sampler
         self.box_coder = box_coder
         self.cls_agnostic_bbox_reg = cls_agnostic_bbox_reg
+        self.cls_weight = cls_weight
 
     def match_targets_to_proposals(self, proposal, target):
         match_quality_matrix = boxlist_iou(target, proposal)
@@ -142,8 +144,7 @@ class FastRCNNLossComputation(object):
         regression_targets = cat(
             [proposal.get_field("regression_targets") for proposal in proposals], dim=0
         )
-
-        classification_loss = F.cross_entropy(class_logits, labels)
+        classification_loss = F.cross_entropy(class_logits, labels, weight=self.cls_weight)
 
         # get indices that correspond to the regression targets for
         # the corresponding ground truth labels, to be used with
@@ -183,11 +184,16 @@ def make_roi_box_loss_evaluator(cfg):
 
     cls_agnostic_bbox_reg = cfg.MODEL.CLS_AGNOSTIC_BBOX_REG
 
+    cls_weight = None
+    if cfg.MODEL.ROI_BOX_HEAD.CLS_LOSS_WEIGHT:
+        cls_weight = torch.tensor(cfg.MODEL.ROI_BOX_HEAD.CLS_LOSS_WEIGHT).cuda()
+
     loss_evaluator = FastRCNNLossComputation(
         matcher, 
         fg_bg_sampler, 
         box_coder, 
-        cls_agnostic_bbox_reg
+        cls_agnostic_bbox_reg,
+        cls_weight
     )
 
     return loss_evaluator

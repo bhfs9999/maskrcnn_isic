@@ -10,7 +10,7 @@ from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.segmentation_mask import SegmentationMask
 
 
-class ISICDataset():
+class ISICDataset:
     CLASSES = (
         "__background__ ",
         "cell",
@@ -64,7 +64,6 @@ class ISICDataset():
         mask = mask / 255
         mask = mask.astype(np.uint8)
 
-        # filter crowd annotations
         # TODO might be better to add an extra field
         annos = self.annos[name]
         boxes = [annos[:4]]
@@ -118,7 +117,6 @@ class ISICDataset():
         img = Image.open(img_path).convert("RGB")
         size = img.size
         img = np.array(img)[:, :, [2, 1, 0]]
-        # filter crowd annotations
 
         annos = self.annos[name]
         boxes = [annos[:4]]
@@ -133,6 +131,8 @@ class ISICDataset():
 
         if self.transforms is not None:
             img_tansformed = self.basetransform(img)
+        else:
+            img_tansformed = img
 
         return img, img_tansformed, target
 

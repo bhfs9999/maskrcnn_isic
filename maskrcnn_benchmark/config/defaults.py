@@ -215,6 +215,8 @@ _C.MODEL.ROI_BOX_HEAD.USE_GN = False
 _C.MODEL.ROI_BOX_HEAD.DILATION = 1
 _C.MODEL.ROI_BOX_HEAD.CONV_HEAD_DIM = 256
 _C.MODEL.ROI_BOX_HEAD.NUM_STACKED_CONVS = 4
+# cls loss weight in roi box head
+_C.MODEL.ROI_BOX_HEAD.CLS_LOSS_WEIGHT = ()
 
 
 _C.MODEL.ROI_MASK_HEAD = CN()
@@ -420,7 +422,7 @@ _C.TEST.EXPECTED_RESULTS_SIGMA_TOL = 4
 # This is global, so if we have 8 GPUs and IMS_PER_BATCH = 16, each GPU will
 # see 2 images per batch
 _C.TEST.IMS_PER_BATCH = 8
-_C.TEST.DRAW_BOX = False
+_C.TEST.DRAW = False
 # Number of detections per image
 _C.TEST.DETECTIONS_PER_IMG = 100
 

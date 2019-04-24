@@ -5,7 +5,7 @@ import os
 
 
 class DatasetCatalog(object):
-    DATA_DIR = "datasets"
+    DATA_DIR = os.path.join(os.path.dirname(__file__), '../', '../', "datasets")
     DATASETS = {
         "coco_2017_train": {
             "img_dir": "coco/train2017",
@@ -16,19 +16,67 @@ class DatasetCatalog(object):
             "ann_file": "coco/annotations/instances_val2017.json"
         },
         "ISIC_2017_train": {
-            "ann_file": "/data/lxc/Skin/ISIC-2017/detection_600/Training/annotations.txt",
-            "root": "/data/mxj/Skin/ISIC-2017/images_600/Training",
-            "mask_root": "/data/mxj/Skin/ISIC-2017/annotations_600/Training"
+            "ann_file": "isic/box/Training/annotations.txt",
+            "root": "isic/img/Training",
+            "mask_root": "isic/mask/Training"
         },
         "ISIC_2017_val": {
-            "ann_file": "/data/lxc/Skin/ISIC-2017/detection_600/Validation/annotations.txt",
-            "root": "/data/mxj/Skin/ISIC-2017/images_600/Validation",
-            "mask_root": "/data/mxj/Skin/ISIC-2017/annotations_600/Validation"
+            "ann_file": "isic/box/Validation/annotations.txt",
+            "root": "isic/img/Validation",
+            "mask_root": "isic/mask/Validation"
         },
         "ISIC_2017_test": {
-            "ann_file": "/data/lxc/Skin/ISIC-2017/detection_600/Test/annotations.txt",
-            "root": "/data/mxj/Skin/ISIC-2017/images_600/Test",
-            "mask_root": "/data/mxj/Skin/ISIC-2017/annotations_600/Test"
+            "ann_file": "isic/box/Test/annotations.txt",
+            "root": "isic/img/Test",
+            "mask_root": "isic/mask/Test"
+        },
+        "Cervix_acid_pos_train": {
+            "ann_file": "cervix/annos/anno.pkl",
+            "img_root": "cervix/img/",
+            "mask_root": "cervix/mask/",
+            "split_file": "cervix/split/acid/train_pos.txt"
+        },
+        "Cervix_acid_pos_valid": {
+            "ann_file": "cervix/annos/anno.pkl",
+            "img_root": "cervix/img/",
+            "mask_root": "cervix/mask/",
+            "split_file": "cervix/split/acid/valid_pos.txt"
+        },
+        "Cervix_acid_pos_test": {
+            "ann_file": "cervix/annos/anno.pkl",
+            "img_root": "cervix/img/",
+            "mask_root": "cervix/mask/",
+            "split_file": "cervix/split/acid/test_pos.txt"
+        },
+        "Cervix_acid_demo": {
+            "ann_file": "cervix/annos/anno.pkl",
+            "img_root": "cervix/img/",
+            "mask_root": "cervix/mask/",
+            "split_file": "cervix/split/acid/demo.txt"
+        },
+        "Cervix_iodine_pos_train": {
+            "ann_file": "cervix/annos/anno.pkl",
+            "img_root": "cervix/img/",
+            "mask_root": "cervix/mask/",
+            "split_file": "cervix/split/iodine/train_pos.txt"
+        },
+        "Cervix_iodine_pos_valid": {
+            "ann_file": "cervix/annos/anno.pkl",
+            "img_root": "cervix/img/",
+            "mask_root": "cervix/mask/",
+            "split_file": "cervix/split/iodine/valid_pos.txt"
+        },
+        "Cervix_iodine_pos_test": {
+            "ann_file": "cervix/annos/anno.pkl",
+            "img_root": "cervix/img/",
+            "mask_root": "cervix/mask/",
+            "split_file": "cervix/split/iodine/test_pos.txt"
+        },
+        "Cervix_iodine_demo": {
+            "ann_file": "cervix/annos/anno.pkl",
+            "img_root": "cervix/img/",
+            "mask_root": "cervix/mask/",
+            "split_file": "cervix/split/iodine/demo.txt"
         },
         "coco_2014_train": {
             "img_dir": "coco/train2014",
@@ -150,14 +198,28 @@ class DatasetCatalog(object):
                 args=args,
             )
         elif "ISIC" in name:
+            data_dir = DatasetCatalog.DATA_DIR
             attrs = DatasetCatalog.DATASETS[name]
             args = dict(
-                ann_file=attrs["ann_file"],
-                root=attrs["root"],
-                mask_root=attrs["mask_root"]
+                ann_file=os.path.join(data_dir, attrs["ann_file"]),
+                root=os.path.join(data_dir, attrs["root"]),
+                mask_root=os.path.join(data_dir, attrs["mask_root"])
             )
             return dict(
                 factory="ISICDataset",
+                args=args,
+            )
+        elif "Cervix" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                ann_file=os.path.join(data_dir, attrs["ann_file"]),
+                img_root=os.path.join(data_dir, attrs["img_root"]),
+                mask_root=os.path.join(data_dir, attrs["mask_root"]),
+                split_file=os.path.join(data_dir, attrs["split_file"]),
+            )
+            return dict(
+                factory="CervixDataset",
                 args=args,
             )
 

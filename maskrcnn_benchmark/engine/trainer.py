@@ -11,6 +11,7 @@ from torchvision.utils import make_grid
 from maskrcnn_benchmark.utils.comm import get_world_size
 from maskrcnn_benchmark.utils.metric_logger import MetricLogger
 from maskrcnn_benchmark.structures.image_list import to_image_list
+from maskrcnn_benchmark.utils.comm import synchronize
 
 
 def reduce_loss_dict(loss_dict):
@@ -41,6 +42,7 @@ def reduce_loss_dict(loss_dict):
 def do_train(
     model,
     data_loader,
+    data_loader_val,
     optimizer,
     scheduler,
     checkpointer,
@@ -86,8 +88,9 @@ def do_train(
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
         meters.update(loss=losses_reduced, **loss_dict_reduced)
 
-        tb_writer.add_scalars('TrainLosses', loss_dict_reduced, global_step=iteration)
-        tb_writer.add_scalar('TrainLoss', losses_reduced, global_step=iteration)
+        if tb_writer:
+            tb_writer.add_scalars('train/Losses', loss_dict_reduced, global_step=iteration)
+            tb_writer.add_scalar('train/Loss', losses_reduced, global_step=iteration)
 
         optimizer.zero_grad()
         losses.backward()
@@ -122,7 +125,7 @@ def do_train(
             # visualize predict box
             # set model to eval mode
             model.eval()
-            vis_image, vis_image_transformed, target = data_loader.dataset.get_image(vis_num)
+            vis_image, vis_image_transformed, target = data_loader_val.dataset.get_image(vis_num)
             image_list = to_image_list(vis_image_transformed, cfg.DATALOADER.SIZE_DIVISIBILITY)
             image_list = image_list.to(device)
             cpu_device = torch.device("cpu")
@@ -141,17 +144,23 @@ def do_train(
             result = torch.from_numpy(result)
             result = result.permute(2, 0, 1)[None, :, :, :]
             result = make_grid([result])
-            tb_writer.add_image('Image_train', result, iteration)
+            if tb_writer:
+                tb_writer.add_image('Image_train', result, iteration)
+            synchronize()
             model.train()
             vis_num += 1
-            vis_num %= len(data_loader.dataset)
+            vis_num %= len(data_loader_val.dataset)
         if iteration % checkpoint_period == 0:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
 
             # eval
             model.eval()
-            result = run_test(cfg, model, distributed, valid=True)
-            tb_writer.add_scalars('Valid', result, global_step=iteration)
+            results = run_test(cfg, model, distributed, iter=iteration, valid=True)
+            if tb_writer:
+                for result in results:
+                    for k, v in result.items():
+                        tb_writer.add_scalar('valid/{}'.format(k), v, global_step=iteration)
+            synchronize()
             model.train()
 
         if iteration == max_iter:
@@ -203,30 +212,38 @@ def overlay_boxes_cls_names(image, predictions, targets):
 
     # draw gt
     gtbox = targets.bbox[0].long()
+    label = int(targets.get_field('labels')[0])
+
     top_left, bottom_right = gtbox[:2].tolist(), gtbox[2:].tolist()
     image = cv2.rectangle(
-        image, tuple(top_left), tuple(bottom_right), gt_color, 2
+        image, tuple(top_left), tuple(bottom_right), gt_color, 1
+    )
+    # draw cls
+    text_pos = (top_left[0], top_left[1] + 20)
+    cv2.putText(
+        image, str(label), text_pos, cv2.FONT_HERSHEY_SIMPLEX, .8, gt_color, 2
     )
 
     # draw prediction
     boxes = predictions.bbox
     scores = predictions.get_field("scores").tolist()
+    labels = predictions.get_field("labels").tolist()
 
-    template = "{:.2f}"
-    for box, score in zip(boxes, scores):
+    template = "{}: {:.2f}"
+    for box, score, label in zip(boxes, scores, labels):
         box = box.to(torch.int64)
         top_left, bottom_right = box[:2].tolist(), box[2:].tolist()
 
         # draw box
         image = cv2.rectangle(
-            image, tuple(top_left), tuple(bottom_right), pred_color, 2
+            image, tuple(top_left), tuple(bottom_right), pred_color, 1
         )
-        s = template.format(score)
+        s = template.format(label, score)
 
         # draw score
         text_pos = (top_left[0], top_left[1] + 20)
         cv2.putText(
-            image, s, text_pos, cv2.FONT_HERSHEY_SIMPLEX, .8, pred_color, 1
+            image, s, text_pos, cv2.FONT_HERSHEY_SIMPLEX, .8, pred_color, 2
         )
 
     return image

@@ -6,8 +6,8 @@ INPUT:
   MAX_SIZE_TEST: 1000
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
-#  WEIGHT: "resume_80000"
+#  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
+  WEIGHT: "resume_80000"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
   RESNETS:
@@ -51,5 +51,3 @@ SOLVER:
   WEIGHT_DECAY: 0.0001
   STEPS: (120000, 160000)
   MAX_ITER: 180000
-TEST:
-  DRAW_BOX: True

@@ -69,7 +69,7 @@ class Mask(object):
 
     def resize(self, size, *args, **kwargs):
         width, height = size
-        scaled_mask = interpolate(self.mask[None, None, :, :], (height, width), mode='bilinear')[0, 0]
+        scaled_mask = interpolate(self.mask[None, None, :, :], (height, width), mode='bilinear', align_corners=True)[0, 0]
         return Mask(scaled_mask, size=size, mode=self.mode)
 
     def convert(self, mode):
@@ -240,8 +240,10 @@ class SegmentationMask(object):
         return self
 
     def __getitem__(self, item):
-        if isinstance(item, (int, slice)):
+        if isinstance(item, int):
             selected_masks = [self.masks[item]]
+        elif isinstance(item, slice):
+            selected_masks = self.masks[item]
         else:
             # advanced indexing on a single dimension
             selected_masks = []

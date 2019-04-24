@@ -3,7 +3,7 @@ from maskrcnn_benchmark.data import datasets
 from .coco import coco_evaluation
 from .voc import voc_evaluation
 from .isic import isic_evaluation
-
+from .cervix import cervix_evaluation
 
 def evaluate(dataset, predictions, output_folder, **kwargs):
     """evaluate dataset using different methods based on dataset type.
@@ -25,6 +25,8 @@ def evaluate(dataset, predictions, output_folder, **kwargs):
         return voc_evaluation(**args)
     elif isinstance(dataset, datasets.ISICDataset):
         return isic_evaluation(**args)
+    elif isinstance(dataset, datasets.CervixDataset):
+        return cervix_evaluation(**args)
     else:
         dataset_name = dataset.__class__.__name__
         raise NotImplementedError("Unsupported dataset type {}.".format(dataset_name))

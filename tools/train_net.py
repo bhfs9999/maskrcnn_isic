@@ -21,13 +21,13 @@ from maskrcnn_benchmark.engine.trainer import do_train
 from maskrcnn_benchmark.modeling.detector import build_detection_model
 from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer
 from maskrcnn_benchmark.utils.collect_env import collect_env_info
-from maskrcnn_benchmark.utils.comm import synchronize, get_rank
+from maskrcnn_benchmark.utils.comm import synchronize, get_rank, is_main_process
 from maskrcnn_benchmark.utils.imports import import_file
 from maskrcnn_benchmark.utils.logger import setup_logger
 from maskrcnn_benchmark.utils.miscellaneous import mkdir
 
 
-def train(cfg, local_rank, distributed):
+def train(cfg, local_rank, distributed, tb_writer):
     model = build_detection_model(cfg)
     device = torch.device(cfg.MODEL.DEVICE)
     model.to(device)
@@ -56,23 +56,24 @@ def train(cfg, local_rank, distributed):
 
     data_loader = make_data_loader(
         cfg,
-        is_train=True,
+        dataset='train',
         is_distributed=distributed,
         start_iter=arguments["iteration"],
     )
 
+    data_loaders_val = make_data_loader(
+        cfg,
+        dataset='valid',
+        is_distributed=distributed)
+    data_loader_val = data_loaders_val[0]
+
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
     vis_period = cfg.SOLVER.VIS_PERIOD
-
-    from datetime import datetime
-
-    current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-    log_dir = os.path.join(cfg.OUTPUT_DIR, current_time)
-    tb_writer = tensorboardX.SummaryWriter(log_dir=log_dir)
 
     do_train(
         model,
         data_loader,
+        data_loader_val,
         optimizer,
         scheduler,
         checkpointer,
@@ -88,7 +89,7 @@ def train(cfg, local_rank, distributed):
     return model
 
 
-def run_test(cfg, model, distributed, valid=False):
+def run_test(cfg, model, distributed, iter, valid=False):
     if distributed:
         model = model.module
     torch.cuda.empty_cache()  # TODO check if it helps
@@ -103,11 +104,13 @@ def run_test(cfg, model, distributed, valid=False):
         dataset_names = cfg.DATASETS.VALID
         if cfg.OUTPUT_DIR:
             for idx, dataset_name in enumerate(dataset_names):
-                output_folder = os.path.join(cfg.OUTPUT_DIR, "validation", dataset_name)
+                output_folder = os.path.join(cfg.OUTPUT_DIR, "validation", dataset_name,
+                                             '{}_{}'.format(iter, cfg.MODEL.ROI_HEADS.SCORE_THRESH))
                 mkdir(output_folder)
                 output_folders[idx] = output_folder
-        data_loaders_val = make_data_loader(cfg, is_train=False, is_distributed=distributed)
-        result = None
+        data_loaders_val = make_data_loader(cfg, dataset='valid', is_distributed=distributed)
+        print(distributed)
+        results = []
         for output_folder, dataset_name, data_loader_val in zip(output_folders, dataset_names, data_loaders_val):
             # TODO if multiple valid set, result will be a list
             result = inference(
@@ -121,17 +124,18 @@ def run_test(cfg, model, distributed, valid=False):
                         expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
                         output_folder=output_folder,
                     )
-            synchronize()
-        return result
+            results.append(result)
+        return results
     else:
         output_folders = [None] * len(cfg.DATASETS.TEST)
         dataset_names = cfg.DATASETS.TEST
         if cfg.OUTPUT_DIR:
             for idx, dataset_name in enumerate(dataset_names):
-                output_folder = os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
+                output_folder = os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name,
+                                             '{}_{}'.format(iter, cfg.MODEL.ROI_HEADS.SCORE_THRESH))
                 mkdir(output_folder)
                 output_folders[idx] = output_folder
-        data_loaders_test = make_data_loader(cfg, is_train=False, is_distributed=distributed)
+        data_loaders_test = make_data_loader(cfg, dataset='test', is_distributed=distributed)
         for output_folder, dataset_name, data_loader_val in zip(output_folders, dataset_names, data_loaders_test):
             inference(
                 model,
@@ -190,6 +194,16 @@ def main():
     if output_dir:
         mkdir(output_dir)
 
+    from datetime import datetime
+    if is_main_process():
+        current_time = datetime.now().strftime('%b%d_%H-%M-%S')
+        print(cfg.OUTPUT_DIR)
+        log_dir = os.path.join(cfg.OUTPUT_DIR, current_time)
+        tb_writer = tensorboardX.SummaryWriter(log_dir=log_dir)
+        print(log_dir)
+    else:
+        tb_writer = None
+
     logger = setup_logger("maskrcnn_benchmark", output_dir, get_rank())
     logger.info("Using {} GPUs".format(num_gpus))
     logger.info(args)
@@ -203,10 +217,10 @@ def main():
         logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
-    model = train(cfg, args.local_rank, args.distributed)
+    model = train(cfg, args.local_rank, args.distributed, tb_writer)
 
     if not args.skip_test:
-        run_test(cfg, model, args.distributed, valid=False)
+        run_test(cfg, model, args.distributed, iter=cfg.SOLVER.MAX_ITER, valid=False)
 
 
 if __name__ == "__main__":

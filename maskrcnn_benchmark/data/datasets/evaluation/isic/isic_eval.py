@@ -1,9 +1,9 @@
 import logging
 import os
-import torch
 import numpy as np
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from tqdm import tqdm
+import pickle as pkl
 
 from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark.structures.bounding_box import BoxList
@@ -28,10 +28,7 @@ def do_isic_evaluation(
     logger.info("Preparing results for ISIC format")
     if "bbox" in iou_types:
         logger.info("Preparing bbox results")
-        pred_boxlists, gt_boxlists, img_namelists = prepare_for_isic_detection(predictions, dataset)
-
-        # save pred box coordiante
-        save_detection_result(img_namelists, pred_boxlists, output_folder)
+        pred_boxlists, gt_boxlists = prepare_for_isic_detection(predictions, dataset, output_folder)
 
         logger.info("Evaluating bbox predictions")
         result = eval_detection_voc(
@@ -89,13 +86,6 @@ def do_isic_evaluation(
 
     return eval_return
 
-def save_detection_result(img_namelists, pred_boxlists, output_folder):
-    with open(os.path.join(output_folder, "detection.txt"), "w") as f:
-        for name, box in zip(img_namelists, pred_boxlists):
-            box = box.bbox.numpy()[0].tolist()
-            box = [str(round(x)) for x in box]
-            f.write('{}\t{}\n'.format(name, ' '.join(box)))
-
 
 def calc_overlap_rate(pred_boxlists, gt_boxlists, th=0.7):
     ious = []
@@ -124,31 +114,45 @@ def get_highest_score_box(prediction):
         return  best_bbox
 
 
-def prepare_for_isic_detection(predictions, dataset):
+def prepare_for_isic_detection(predictions, dataset, output_folder):
     # assert isinstance(dataset, ISISDataset)
+    records = {}
     pred_boxlists = []
     gt_boxlists = []
-    img_namelists = []
     for image_id, prediction in enumerate(predictions):
+        record = {}
         if len(prediction) == 0:
+            record['have_box'] = 0
             continue
+        else:
+            record['have_box'] = 1
+            prediction = get_highest_score_box(prediction)
+            img_info = dataset.get_img_info(image_id)
 
-        prediction = get_highest_score_box(prediction)
-        img_info = dataset.get_img_info(image_id)
+            image_width = img_info["width"]
+            image_height = img_info["height"]
+            prediction = prediction.resize((image_width, image_height))
+            prediction = prediction.convert("xyxy")
+            pred_boxlists.append(prediction)
 
-        image_width = img_info["width"]
-        image_height = img_info["height"]
-        prediction = prediction.resize((image_width, image_height))
-        prediction = prediction.convert("xyxy")
-        pred_boxlists.append(prediction)
+            gt_boxlist = dataset.get_gt_box(image_id)
+            gt_boxlists.append(gt_boxlist)
 
-        gt_boxlist = dataset.get_gt_box(image_id)
-        gt_boxlists.append(gt_boxlist)
+            img_name = dataset.get_img_name(image_id)
 
-        img_name = dataset.get_img_name(image_id)
-        img_namelists.append(img_name)
+            record['width'] = image_width
+            record['height'] = image_height
+            box = prediction.bbox.numpy()[0].tolist()
+            box = [str(round(x)) for x in box]
+            record['x1'] = box[0]
+            record['y1'] = box[1]
+            record['x2'] = box[2]
+            record['y2'] = box[3]
+            records[img_name] = record
 
-    return pred_boxlists, gt_boxlists, img_namelists
+        pkl.dump(records, open(os.path.join(output_folder, 'detection.pkl'), 'wb'))
+
+    return pred_boxlists, gt_boxlists
 
 
 def prepare_for_isic_segmentation(predictions, dataset):

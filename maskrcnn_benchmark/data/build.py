@@ -104,9 +104,9 @@ def make_batch_data_sampler(
     return batch_sampler
 
 
-def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0):
+def make_data_loader(cfg, dataset='train', is_distributed=False, start_iter=0):
     num_gpus = get_world_size()
-    if is_train:
+    if dataset == 'train':
         images_per_batch = cfg.SOLVER.IMS_PER_BATCH
         assert (
             images_per_batch % num_gpus == 0
@@ -148,7 +148,14 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0):
         "maskrcnn_benchmark.config.paths_catalog", cfg.PATHS_CATALOG, True
     )
     DatasetCatalog = paths_catalog.DatasetCatalog
-    dataset_list = cfg.DATASETS.TRAIN if is_train else cfg.DATASETS.TEST
+    is_train = False
+    if dataset == 'train':
+        dataset_list = cfg.DATASETS.TRAIN
+        is_train = True
+    elif dataset == 'valid':
+        dataset_list = cfg.DATASETS.VALID
+    else:
+        dataset_list = cfg.DATASETS.TEST
 
     transforms = build_transforms(cfg, is_train)
     datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train)
